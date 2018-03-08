@@ -1,0 +1,118 @@
+<apex:page standardcontroller="Lead" lightningStylesheets="true">
+    <!-- CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" />
+    <!-- JS -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular.min.js"></script>
+
+    <!-- We need this in order to upload the attachment -->
+    <!-- Check the link below for more information -->
+    <!-- https://developer.salesforce.com/docs/atlas.en-us.ajax.meta/ajax/sforce_api_ajax_connecting.htm -->
+    <script src="../../soap/ajax/42.0/connection.js" type="text/javascript"></script>
+
+
+    <script type="text/javascript">
+        var testApp = angular.module('testApp',[]);
+        testApp.controller('testCtrl', ['$scope' ,function($scope) {
+            var vm = this;
+
+            // We get the session id
+            sforce.connection.sessionId='{!GETSESSIONID()}';
+
+            // object where we're going to save image data
+            vm.image = null;
+
+            // id opp that comes from input text
+            vm.idOpp = '';
+
+            // object that will let us know when the image has been succesfully updloaded
+            vm.displayMessage = {isCreated : false, message : 'Image has been created !'}
+
+            vm.saveb64 = function(file){
+                //console.log('file', file)
+                //vm.img64 = file.file;
+                vm.image = file.file
+
+                //console.log('Image64', vm.img64)
+                // delete 'data:image/png;base64,'
+                var pos = vm.image.base64.search(",");
+                vm.image.base64 = vm.image.base64.slice(pos + 1, vm.image.base64.length);
+                //console.log('vm.image', vm.image)
+                //console.log('vm.image.base64', vm.image.base64)
+            }
+
+            vm.sendInfo = function(){
+
+                var objAttachment = new sforce.SObject("Attachment");
+
+                //We fill the required fields
+                objAttachment.Body = vm.image.base64
+                objAttachment.ParentId = vm.idOpp
+                objAttachment.ContentType = vm.image.type
+                objAttachment.Name = vm.image.name
+
+                // and then we insert the attachment :D
+                var result = sforce.connection.create([objAttachment]);
+
+                console.log('result', result)
+                vm.displayMessage.isCreated = true
+
+            }
+
+        }]);
+
+
+        // I used this directive from the checked answer and modified according to my needs:
+        // https://stackoverflow.com/questions/42226740/how-to-get-file-content-and-other-details-in-angularjs
+        testApp.directive('upload',[function() {
+          return {
+            require : 'ngModel',
+            scope : {format: '@', upload : '&upload'},
+            link : function(scope, el, attrs, ngModel) {
+              // change event is fired when file is selected
+              el.bind('change', function(event) {
+
+                var objInfo = event.target.files[0]
+
+                // I used this code from this web page and modified according to my needs : 
+                // https://sysgears.com/notes/get-a-base64-encoded-image-using-ng-flow-in-angularjs/
+                var fileReader = new FileReader();
+                fileReader.onload = function (event) {
+
+                    var objFile = {}
+                    objFile.base64 = event.target.result
+                    objFile.type = objInfo.type
+                    objFile.name = objInfo.name
+
+                    scope.upload({file:objFile})
+                };
+                fileReader.readAsDataURL(objInfo);
+
+                scope.$apply(function() {
+                  ngModel.$setViewValue(el.val());
+                  ngModel.$render();
+                });
+              })
+            }
+          }
+        }]);
+    </script>
+
+    <body ng-app="testApp" ng-controller="testCtrl as vm">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-6">
+                    <label for="">Opportunity Id</label>
+                    <input type="text" class="form-control" ng-model="vm.idOpp" ></input>
+                </div>
+                <div class="col-sm-6">
+                    <label for="" ng-bind="vm.text2"></label>
+                    <input type="file" accept="image/*" capture="camera" ng-model="vm.imagen"  upload="vm.saveb64({file: file})"></input>
+                </div>
+
+                <h1 ng-if="vm.displayMessage.isCreated" ng-bind="vm.displayMessage.message"></h1>
+                    
+            </div>
+            <button class="btn btn-primary" ng-click="vm.sendInfo()">Send !</button>
+        </div>
+    </body>
+</apex:page>
